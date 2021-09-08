@@ -55,6 +55,20 @@ conda activate amt_db
 # Calculate weekly NSD for each individual
 Rscript $wd/src/poc/cranes/calc_nsd.r $wd/data/anno_move.db $wd/analysis/cranes/nsd.csv
 
+
+##-- Niche Accumulation --##
+
+# NOTE: anticipates univariate annotation - thus re-run annotation call below to
+  # gather specific annotation for this script
+
+  #- Univariate Annotation Join
+conda activate db
+
+# NOTE: control file must be updated to select which variables are joined
+Rscript $wd/src/poc/cranes/join_annos.r $wd/data/anno_move.db $wd/data/anno_move.db $wd/analysis/cranes/ctfs/anno_vars.csv 
+
+
+
 ##-- Plots --##
 
 #activate conda env

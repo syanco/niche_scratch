@@ -96,67 +96,65 @@ evt$event_id <- as.numeric(evt$event_id)
 
 message("Collecting annotations...")
 
-# TODO:  Clean up below - comment out the old approach of joining inside the db,
-# new approach runs in mem - so probably no great for lots of vars...
-
-#################################
-#new approach, load into mem, then do the joins?
-
 #-- Dynamic Annotations
-#pull the required tables into memory and store in list
-annos_dyn <- list()
-for(i in 1:nrow(runs_dyn)){
-  annos_dyn[[i]] <- tbl(db, runs_dyn$table[i]) %>% 
-    filter(variable == !!runs_dyn$variable[i],
-           s_buff == !!runs_dyn$s_buff[i],
-           t_buff == !!runs_dyn$t_buff[i]) %>% 
-    rename_with(.fn = ~c(glue("variable_{runs_dyn$variable[i]}"),
-                         glue("s_buff_{runs_dyn$variable[i]}"),
-                         glue("product_{runs_dyn$variable[i]}"),
-                         glue("total_scenes_{runs_dyn$variable[i]}"),
-                         glue("total_value_scenes_{runs_dyn$variable[i]}"),
-                         glue("pixel_count_{runs_dyn$variable[i]}"),
-                         glue("value_{runs_dyn$variable[i]}"),
-                         glue("stdev_{runs_dyn$variable[i]}"),
-                         glue("t_buff_{runs_dyn$variable[i]}"),
-                         glue("notes_{runs_dyn$variable[i]}")),
-                .cols = c(variable, s_buff, product, total_scenes, 
-                          total_value_scenes, pixel_count, value, stdev, t_buff, 
-                          notes)) %>% 
-    collect()
-} #i
 
+if(nrow(runs_dyn) > 0){
+  #pull the required tables into memory and store in list
+  annos_dyn <- list()
+  for(i in 1:nrow(runs_dyn)){
+    annos_dyn[[i]] <- tbl(db, runs_dyn$table[i]) %>% 
+      filter(variable == !!runs_dyn$variable[i],
+             s_buff == !!runs_dyn$s_buff[i],
+             t_buff == !!runs_dyn$t_buff[i]) %>% 
+      rename_with(.fn = ~c(glue("variable_{runs_dyn$variable[i]}"),
+                           glue("s_buff_{runs_dyn$variable[i]}"),
+                           glue("product_{runs_dyn$variable[i]}"),
+                           glue("total_scenes_{runs_dyn$variable[i]}"),
+                           glue("total_value_scenes_{runs_dyn$variable[i]}"),
+                           glue("pixel_count_{runs_dyn$variable[i]}"),
+                           glue("value_{runs_dyn$variable[i]}"),
+                           glue("stdev_{runs_dyn$variable[i]}"),
+                           glue("t_buff_{runs_dyn$variable[i]}"),
+                           glue("notes_{runs_dyn$variable[i]}")),
+                  .cols = c(variable, s_buff, product, total_scenes, 
+                            total_value_scenes, pixel_count, value, stdev, t_buff, 
+                            notes)) %>% 
+      collect()
+  } # i
+} # if 
 
 #-- Static Annotations
-#pull the required tables into memory and store in list
-annos_stat <- list()
-for(i in 1:nrow(runs_stat)){
-  annos_stat[[i]] <- tbl(db, runs_stat$table[i]) %>% 
-    filter(variable == !!runs_stat$variable[i],
-           s_buff == !!runs_stat$s_buff[i],
-           t_buff == !!runs_stat$t_buff[i]) %>% 
-    rename_with(.fn = ~c(glue("variable_{runs_stat$variable[i]}"),
-                         glue("s_buff_{runs_stat$variable[i]}"),
-                         glue("product_{runs_stat$variable[i]}"),
-                         glue("total_scenes_{runs_stat$variable[i]}"),
-                         glue("total_value_scenes_{runs_stat$variable[i]}"),
-                         glue("pixel_count_{runs_stat$variable[i]}"),
-                         glue("value_{runs_stat$variable[i]}"),
-                         glue("stdev_{runs_stat$variable[i]}"),
-                         glue("t_buff_{runs_stat$variable[i]}"),
-                         glue("notes_{runs_stat$variable[i]}")),
-                .cols = c(variable, s_buff, product, total_scenes, 
-                          total_value_scenes, pixel_count, value, stdev, t_buff, 
-                          notes)) %>% 
-    collect()
-} #i
 
+if(nrow(runs_stat) > 0){
+  #pull the required tables into memory and store in list
+  annos_stat <- list()
+  for(i in 1:nrow(runs_stat)){
+    annos_stat[[i]] <- tbl(db, runs_stat$table[i]) %>% 
+      filter(variable == !!runs_stat$variable[i],
+             s_buff == !!runs_stat$s_buff[i],
+             t_buff == !!runs_stat$t_buff[i]) %>% 
+      rename_with(.fn = ~c(glue("variable_{runs_stat$variable[i]}"),
+                           glue("s_buff_{runs_stat$variable[i]}"),
+                           glue("product_{runs_stat$variable[i]}"),
+                           glue("total_scenes_{runs_stat$variable[i]}"),
+                           glue("total_value_scenes_{runs_stat$variable[i]}"),
+                           glue("pixel_count_{runs_stat$variable[i]}"),
+                           glue("value_{runs_stat$variable[i]}"),
+                           glue("stdev_{runs_stat$variable[i]}"),
+                           glue("t_buff_{runs_stat$variable[i]}"),
+                           glue("notes_{runs_stat$variable[i]}")),
+                  .cols = c(variable, s_buff, product, total_scenes, 
+                            total_value_scenes, pixel_count, value, stdev, t_buff, 
+                            notes)) %>% 
+      collect()
+  } # i
+} # if
 message("Disconnecting from databse...")
 dbDisconnect(db)
 
 
 #-- Dynamic Joins
-if(length(annos_dyn) > 0){
+if(exists("annos_dyn")){
   message("Starting dynamic joins...")
   
   # do the first join outside loop
@@ -180,7 +178,7 @@ if(length(annos_dyn) > 0){
 
 
 #-- Static Joins
-if(length(annos_stat) > 0){
+if(exists("annos_stat")){
   message("Starting static joins...")
   
   # do the first join outside loop
@@ -233,7 +231,7 @@ if(.rollback) {
   message('Rolling back transaction because this is a test run.')
   dbRollback(db)
 } else {
-  message(glue("Committing table 'join_{Sys.Date()}' to databse."))
+  message(glue("Committing table 'join_{Sys.Date()}' to database."))
   dbCommit(db)
 }
 
@@ -241,12 +239,3 @@ message("Disconnecting from databse...")
 dbDisconnect(db)
 
 message(glue('Script complete in {diffmin(t0)} minutes'))
-
-# tic()
-# dat <- 'select * 
-# from event e
-# inner join cranes_modis_evi m on e.event_id = m.event_id' %>%
-#   dbGetQuery(db,.)
-# toc()
-
-
