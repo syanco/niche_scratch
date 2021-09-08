@@ -31,7 +31,7 @@ if(interactive()) {
   .rollback <- TRUE
   rd <- here::here
   
-  .outPF <- file.path(.wd,'analysis/cranes/niche_sizes.csv')
+  .outPF <- file.path(.wd,'analysis/cranes/niche_accum.csv')
   .dbPF <- file.path(.wd,'data/anno_move.db')
   .ctfPF <- file.path(.wd, "analysis/cranes/ctfs/anno_vars.csv")
   .anno <- "anno_join_2021-09-08"
@@ -67,9 +67,10 @@ suppressWarnings(
     library(DBI)
     library(RSQLite)
     library(lubridate)
-    library(MVNH)
+    library(geosphere)
+    # library(MVNH)
   }))
-
+conflict_prefer("lag", "dplyr")
 #Source all files in the auto load funs directory
 list.files(rd('src/funs/auto'),full.names=TRUE) %>%
   walk(source)
@@ -86,7 +87,7 @@ runs <- ctf %>%
 
 .values <- .variables %>% 
   sapply(., FUN = function(x){glue("value_{x}")}) %>% 
-  c()
+  as.character()
 
 #---- Initialize database ----#
 message("Initializing database connection...")
@@ -115,16 +116,23 @@ anno_mod <- anno0 %>%
                 year = year(timestamp), #year var
                 WKxYR = glue("{year}{week}")) #year X week combo var 
 
-message("Calculating niche sizes...")
-ind_ts_dat <- lapply(as.list(unique(anno_mod$individual_id)), FUN = indNTS, 
-                     data = anno_mod, interval = "WKxYR",
-                     vars=.values, log = T) %>%
+#TODO: this is just for testing remove eventually
+ind_ID <- c(55754621,234543899,146932155,10836626,234544351, 195375963,963160836)
+anno_mod_ind <- anno_mod %>% 
+  filter(individual_id %in% ind_ID)
+
+#TODO: Right now the variable is hardcoded - should be able to find a way to get
+  # this from .values... 
+message("Calculating niche accumulations+")
+ind_ts_dat <- lapply(as.list(unique(anno_mod_ind$individual_id)), FUN = indNicheAccum, 
+                     data = anno_mod_ind, interval = WKxYR,
+                     vars=`value_derived:evi`) %>%
   bind_rows()
 
 
 #---- Finalize script ----#
 
 message(glue("Saving output to: {.outPF}"))
-write_csv(ind_ts_dat, path = .outPF)
+write_csv(ind_ts_dat, file = .outPF)
 
 message(glue('Script complete in {diffmin(t0)} minutes'))

@@ -99,14 +99,14 @@ indNDissim <- function(ind_ID, data, interval, min_obs = 2, vars){
                  na.omit() %>% # omit NAs
                  MVNH_dissimilarity(db1 = ., db2 = niche0), #calculate niche dissim
                error=function(e) {list(Bhattacharyya_distance = NA,
-                                             Mahalanobis_distance = NA,
-                                             Determinant_ratio = NA)}
+                                       Mahalanobis_distance = NA,
+                                       Determinant_ratio = NA)}
       ) # tryCatch
     } #f(x)
     ) %>% # lapply
     do.call("rbind", .) %>% #bind the list elements back together
     as.data.frame() #convert to DF (not tibble)
-
+  
   #create matching identifier information to link back up to the niche estimates
   indID <- dat_ind %>% 
     group_by_(interval) %>% #group by time interval
@@ -117,7 +117,7 @@ indNDissim <- function(ind_ID, data, interval, min_obs = 2, vars){
         summarize(WKxYR = WKxYR[1], # week X yr factor
                   ind = individual_id[1], #ind ID
                   ts = timestamp[1] #interval starting time stamp
-                  ) 
+        ) 
     }) %>%
     # bind_rows()
     do.call("rbind", .) %>% #bind the list elements back together
@@ -128,4 +128,65 @@ indNDissim <- function(ind_ID, data, interval, min_obs = 2, vars){
   ) # tryCatch
   
   return(out) #return the combined DF for the target individual
+}
+
+
+# function to calculate individual-specific time-varying niche size
+# intended to applied across a list of individuals
+#
+# ind_ID = unique identifier for target individual
+# data = DF containing niche and timestamp info
+# interval = time slice for calculating niche - 
+#             should refer to a factor variable in the data
+# min obs = minimum # of observations per time slice
+# vars = vector of niche variables to use (declared as objects, not strings)
+# log = should `MVNH_det` log transform output?
+indNicheAccum <- function(ind_ID, data, interval, min_obs = 2, vars){
+  
+  if("individual_id" %notin% colnames(data))
+  {stop("Data must contain a column called 'individual_id'.")}
+  
+  #convert vars vector to enquos so that select can read it
+  .vars <- enquos(vars)
+  
+  #prep data for niche size estimation
+  dat_ind <- data %>% 
+    filter(individual_id==ind_ID) %>% #select target individual
+    arrange({{interval}}) %>% 
+    group_by({{interval}}) %>% #group by the supplied time interval
+    # mutate(n=n()) %>% #calculate # of observations per interval
+    # filter(n >= min_obs) %>% #filter out those below the supplied minimum
+    summarise(n = n(),
+              max = max({{vars}}, na.rm = T),
+              min = min({{vars}}, na.rm = T),
+              lon1 = lon[1], # get first coords in interval
+              lat1 = lat[1],
+              lon2 = lon[n], # get last coords in interval
+              lat2 = lat[n],
+              WKxYR = WKxYR[1], # week X yr factor
+              ind = individual_id[1], #ind ID
+              ts = timestamp[1] #interval starting time stamp
+    ) %>%
+    mutate(range = max-min,
+           c_max = order_by(ts, cummax(max)), # cummulative maximum
+           c_min = order_by(ts, cummin(min)), # cummulative minimum
+           c_range = (c_max-c_min), # running cummulative range
+           c_n = order_by(ts, cumsum(n)), # data points accumulated
+           # dist = distGeo(p1 = c(lon1, lat1), p2 = c(lon2, lat2)),
+    ) %>% 
+    ungroup() %>%
+    rowwise() %>% # need to mutate after rowwise b/c distGeos is not vectorized
+    mutate(dist = distGeo(p1 = c(lon1, lat1), p2 = c(lon2, lat2))) %>% 
+    ungroup() %>% #cancel the rowwise operation to get cummulative distance 
+    mutate(c_dist = order_by(ts, cumsum(dist))
+           )
+  # 
+  # nsd_dat <- dat_ind %>% 
+  #   make_track(.x = lon, .y = lat, .t = ts, order_by_ts = F, 
+  #            crs = CRS("+init=epsg:4326"), all_cols = T) %>% 
+  #   mutate(netSQ=nsd(.),
+  #          nsd_accum = netSQ+dplyr::lag(netSQ)) #add NSD variable to each individual DF
+  # 
+  
+  return(dat_ind) #return the combined DF for the target individual
 }
