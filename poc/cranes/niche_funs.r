@@ -159,27 +159,8 @@ indNicheAccum <- function(ind_ID, data, interval, min_obs = 2, vars){
     summarise(n = n(),
               max = max({{vars}}, na.rm = T),
               min = min({{vars}}, na.rm = T),
-              lon1 = lon[1], # get first coords in interval
-              lat1 = lat[1],
-              lon2 = lon[n], # get last coords in interval
-              lat2 = lat[n],
-              WKxYR = WKxYR[1], # week X yr factor
-              ind = individual_id[1], #ind ID
-              ts = timestamp[1] #interval starting time stamp
-    ) %>%
-    mutate(range = max-min,
-           c_max = order_by(ts, cummax(max)), # cummulative maximum
-           c_min = order_by(ts, cummin(min)), # cummulative minimum
-           c_range = (c_max-c_min), # running cummulative range
-           c_n = order_by(ts, cumsum(n)), # data points accumulated
-           # dist = distGeo(p1 = c(lon1, lat1), p2 = c(lon2, lat2)),
-    ) %>% 
-    ungroup() %>%
-    rowwise() %>% # need to mutate after rowwise b/c distGeos is not vectorized
-    mutate(dist = distGeo(p1 = c(lon1, lat1), p2 = c(lon2, lat2))) %>% 
-    ungroup() %>% #cancel the rowwise operation to get cummulative distance 
-    mutate(c_dist = order_by(ts, cumsum(dist))
-           )
+              range = max-min) %>%
+    ungroup()
   # 
   # nsd_dat <- dat_ind %>% 
   #   make_track(.x = lon, .y = lat, .t = ts, order_by_ts = F, 
