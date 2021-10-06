@@ -27,7 +27,7 @@ Options:
 if(interactive()) {
   library(here)
   
-  .wd <- '~/projects/niche_scratch'
+  .wd <- '~/project/niche_scratch'
   .rollback <- TRUE
   rd <- here::here
   
@@ -58,9 +58,9 @@ if(interactive()) {
 #---- Initialize Environment ----#
 t0 <- Sys.time()
 
-source(rd('src/startup.r'))
+source(file.path(.wd, 'src/startup.r'))
 #TODO: fix this file path after moving the function script
-source(rd("src/poc/cranes/niche_funs.r"))
+source(file.path(.wd, "src/poc/cranes/niche_funs.r"))
 
 suppressWarnings(
   suppressPackageStartupMessages({
@@ -69,6 +69,7 @@ suppressWarnings(
     library(lubridate)
     library(geosphere)
     library(mgcv)
+    library(viridisLite)
     # library(MVNH)
   }))
 conflict_prefer("lag", "dplyr")
@@ -102,11 +103,11 @@ message("Loading annotations...")
 anno0 <- tbl(db, .anno)
 message("Loading species data...")
 sp <- tbl(db, "individual")
-message("Disconnecting from databse...")
 
 dat <- anno0 %>% 
   left_join(sp, by = "individual_id") %>% 
-  filter(taxon_canonical_id == "Grus grus")
+  filter(taxon_canonical_name == "Anthropoides virgo") %>%
+  collect()
 
 message("Gathering niche data...")
 
@@ -120,7 +121,7 @@ anno_mod <- dat %>%
   dplyr::mutate(week = week(timestamp), #week var
                 year = year(timestamp), #year var
                 WKxYR = glue("{year}{week}"),
-                doy = yday(timestamp)) %>%  #year X week combo var 
+                doy = yday(timestamp)) %>%  #year X week combo var N
   rename(evi = `value_derived:evi`, #make some easier to use names
          sp = taxon_canonical_name) %>% 
   mutate(sp_f = as.factor(sp)) %>% # create factor version of species
@@ -132,7 +133,7 @@ anno_mod <- dat %>%
             lon_m = mean(lon),
             lat_m = mean(lat),
             g_speed_m = mean(ground_speed),
-            ts = timestamp[1])
+            ts = timestamp[1]) 
 
 #read in NSD data created by `calc_nsd.r`
 dat_track_nsd <- read.csv("analysis/cranes/nsd.csv")
@@ -163,8 +164,81 @@ anno_Av <- anno_mod %>%
 # Fit gams
 m0 <- gam(evi_m ~ 1, data = anno_Av, method = 'REML')
 
-m <- gam(evi_m ~ 0 + ind + s(doy, bs = "cc", by = ind),
-         data = anno_Av, method = 'REML')
+m1 <- gam(evi_m ~ ind + s(doy, bs = "cc", by = ind, k = 5),
+          data = anno_Av, method = 'REML')
+
+m2 <- gam(evi_m ~ s(doy, bs = "cc", k = 5),
+          data = anno_Av, method = 'REML')
+
+AIC(m0, m1, m2)
+
+##--  Plots
+# fits for doy as pred
+pdat <- expand.grid(doy = 1:366,
+                    ind = unique(anno_Av$ind))
+p <- predict(m1, newdata = pdat, se.fit = T)
+
+pred_df <- cbind(pdat, p) %>% 
+  mutate(lwr = fit - 2*se.fit,
+         upr = fit + 2*se.fit)
+
+max_d <- anno_Av %>% 
+  group_by(ind) %>% 
+  summarize(max_d = max(netSQ))
+
+max_y <- anno_Av %>% 
+  group_by(ind) %>% 
+  summarize(max_y = max(y_))
+
+mean_x <- anno_Av %>% 
+  group_by(ind) %>% 
+  summarise(mean_x = mean(x_))
+
+pred_df <- pred_df %>% 
+  left_join(max_d) %>% 
+  left_join(max_y) %>% 
+  left_join(mean_x) %>% 
+  mutate(max_d_f = as.factor(max_d))
+
+# need to add the max d factor to Anno for plotting
+anno_Av <- anno_Av %>% 
+  mutate(max_df_f = as.factor(max(netSQ)))
+
+# # fits and dat on grid of plots by spp
+ggplot() +
+  geom_point(data=anno_Av,
+             aes(x=doy, y = evi_m, color = as.factor(ind)),
+             alpha = 0.5)+
+  geom_ribbon(data = pred_df, aes(x = doy, ymin = lwr, ymax = upr), alpha = 0.2) +
+  geom_line(data = pred_df, aes(x = doy, y = fit)) +
+  facet_wrap(~ ind, ncol = 2) +
+  # coord_cartesian(ylim = c(-30,30)) +
+  labs(x = "Day of year", y = 'EVI')+
+  theme(legend.position = "none")
+
+# cranes with large gaps... (this is not a good solution long term...)
+badcranes <- c(954263119, 954266247,959785210)
+
+`%notin%` <- Negate(`%in%`)
+
+pred_df <- pred_df %>% 
+  filter(ind %notin% badcranes)
+anno_Av <- anno_Av %>% 
+  filter(ind %notin% badcranes)
+
+# only fits, all on one
+ggplot() +
+  # geom_point(data=anno_Av, aes(x = doy, y = evi_m,
+  # group = max_d_f
+  # )) +
+  geom_ribbon(data = pred_df, aes(x = doy, ymin = lwr, ymax = upr, group = ind),
+              alpha = 0.2) +
+  geom_line(data = pred_df, aes(x = doy, y = fit,
+                                group = ind, color = mean_x
+  )) +
+  scale_color_viridis_c()+
+  labs(x = "Day of year", y = 'EVI') +
+  facet_grid(~as.factor(mean_x))
 
 
 
@@ -180,10 +254,10 @@ m0 <- gam(evi_m ~ 1, data = anno_mod, method = 'REML')
 m <- gam(evi_m ~ 0 + sp_f + s(doy, bs = "cc", by = sp_f, k = 5),
          data = anno_mod, method = 'REML')
 m_lat <- gam(evi_m ~ 0 + sp_f + s(lat_m, bs = "tp", by = sp_f, k = 5),
-         data = anno_mod, method = 'REML')
+             data = anno_mod, method = 'REML')
 
 mRE <- gam(evi_m ~ 0 + sp_f + s(doy, bs = "cc", by = sp_f, k = 5) + s(individual_id, bs = "re"),
-         data = anno_mod, method = 'REML')
+           data = anno_mod, method = 'REML')
 
 summary(m)
 plot(m_lat)
@@ -228,8 +302,8 @@ pred_df <- cbind(pdat, p) %>%
 # fits and dat on grid of plots by spp
 ggplot() +
   geom_line(data=anno_mod, 
-             aes(x=doy, y = evi_m, color = as.factor(indYr)),
-             alpha = 0.5)+
+            aes(x=doy, y = evi_m, color = as.factor(indYr)),
+            alpha = 0.5)+
   geom_ribbon(data = pred_df, aes(x = doy, ymin = lwr, ymax = upr), alpha = 0.2) +
   geom_line(data = pred_df, aes(x = doy, y = fit)) +
   facet_wrap(~ sp_f, ncol = 2) +
@@ -315,7 +389,7 @@ anno_mod_1 <- anno_mod %>%
   filter(!is.na(mig_stat))
 
 m.1 <- gam(evi_m ~ mig_stat + s(doy, bs = "cc", by = mig_stat),
-         data = anno_mod_1, method = 'REML')
+           data = anno_mod_1, method = 'REML')
 
 
 pdat <- expand.grid(doy = 1:366,
@@ -343,7 +417,7 @@ anno_Gg <- anno_mod %>%
 m0_Gg <- gam(evi_m ~ 1, data = anno_Gg, method = 'REML')
 
 m_Gg <- gam(evi_m ~ 0 + ind_f + s(doy, bs = "cc", by = ind_f),
-         data = anno_Gg,  method = 'REML')
+            data = anno_Gg,  method = 'REML')
 
 AIC(m0_Gg, m_Gg)
 
@@ -383,6 +457,8 @@ for(i in 1:length(ind_ID)){
 }
 
 #---- Finalize script ----#
+
+message("Disconnecting from databse...")
 dbDisconnect(db)
 
 message(glue("Saving output to: {.outPF}"))
