@@ -1,5 +1,8 @@
 library(forcats)
 library(lubridate)
+library(dplyr)
+library(RSQLite)
+library(DBI)
 
 #---- Functions ----#
 
@@ -38,6 +41,7 @@ pop <- read.csv("analysis/cranes/Anthropoides virgo_landsat8_evi_500_16.csv")
 
 # Pull in indivdiual niches
 
+.anno <- "anno_join_2021-09-08"
 .wd <- '~/project/niche_scratch'
 .dbPF <- file.path(.wd,'data/anno_move.db')
 
@@ -61,12 +65,13 @@ sp %>%
 dat <- anno0 %>% 
   left_join(sp, by = "individual_id") %>% 
   filter(taxon_canonical_name == "Anthropoides virgo") %>%
-  collect()
+  collect() %>% 
+  mutate(ind_f = factor(individual_id))
 
 
 # Calc individual means and vars
 ind_sum <- dat %>%
-  mutate(ind_f = as.factor(individual_id)) %>% 
+  # mutate(ind_f = as.factor(individual_id)) %>% 
   group_by(ind_f) %>% 
   summarise(mu = mean(na.omit(`value_derived:evi`)),
             sd = sd(na.omit(`value_derived:evi`)))
@@ -81,12 +86,21 @@ ind_sum <- dat %>%
 (pop_mean <- mean(na.omit(pop$value)))
 (pop_var <- var(na.omit(pop$value)))
 
-# gather into a df
-df <- data.frame(mu = c(mix_mean, pop_mean),
-                  var = c(mix_var, pop_var))
-row.names(df) <- c("mixture est", "pop est")
-df
 
+# do it with lmer
+library(lme4)
+
+fm <- lmer(`value_derived:evi` ~ 1 + (1|ind_f), data = dat)
+summary(fm)
+(vc <- as.data.frame(VarCorr(fm)))
+vc_var <- sum(vc$vcov)
+vc_mean <- fixef(fm)
+
+# gather into a df
+df <- data.frame(mu = c(mix_mean, vc_mean, pop_mean),
+                 var = c(mix_var, vc_var, pop_var))
+row.names(df) <- c("mixture est", "variance components est", "pop est")
+df
 
 # get individual contributions to pop variance
 contrib <- c()
@@ -116,10 +130,21 @@ move_sum <- dat_track_nsd %>%
   right_join(ind_sum) %>% 
   filter(dur >= 200) #remove individuals with "short" tracks
 
+dat <- dat %>% 
+  mutate(ts = ymd_hms(timestamp),
+         doy = yday(ts),
+         yr = year(ts),
+         indyr = factor(paste0(ind_f, yr)))
 
 #---- Plots ----#
 library(ggplot2)
 library(viridisLite)
+
+ggplot() +
+  geom_line(data=dat, aes(x = doy, y = `value_derived:evi`, color = indyr),
+            alpha= 0.3) +
+  theme(legend.position = "none")
+
 
 # plot of all ind and pop distributions
 ggplot() +
@@ -150,10 +175,30 @@ move_sum %>% mutate(ind_f = fct_reorder(ind_f, sd^2, min)) %>%   # reset factors
 
 # plot variance contribution components
 ggplot(move_sum)+
-  geom_point(aes(x=mean_contrib, y = sd^2, color = max_nsd)) +
-  geom_abline(intercept = 0) +
-  xlim(c(0,0.05)) +
-  ylim(c(0,0.05))
+  geom_point(aes(x=mean_contrib, y = sd^2, color = mean_lat)) +
+  geom_abline(intercept = 0)
+  # xlim(c(0,0.05)) +
+  # ylim(c(0,0.05))
+
+
+# ggplot(move_sum, aes(x=mean_lat, y = mean_contrib))+
+#   geom_point() +
+#   geom_smooth(method= "lm")
+# 
+# lat0 <- lm(mean_contrib ~ 1, data = move_sum)
+# lat1 <- lm(mean_contrib ~ mean_lat, data = move_sum)
+# AIC(lat0, lat1)
+# summary(lat1)
+# 
+# ggplot(move_sum, aes(x=mean_lat, y = sd^2))+
+#   geom_point() +
+#   geom_smooth(method= "lm")
+# 
+# lat0 <- lm(sd^2 ~ 1, data = move_sum)
+# lat1 <- lm(sd^2 ~ mean_lat, data = move_sum)
+# AIC(lat0, lat1)
+# 
+
 
 # Movement Plots
 ggplot(move_sum)+
@@ -162,6 +207,13 @@ ggplot(move_sum)+
   geom_point(aes(x=max_nsd, y = mean_contrib))
 ggplot(move_sum)+
   geom_point(aes(x=max_nsd, y = sd^2))
+ggplot(move_sum)+
+  geom_point(aes(x=max_nsd, y = mean_contrib/(sd^2)))
+ggplot(move_sum)+
+  geom_point(aes(x=mean_lat, y = mean_contrib/(sd^2)))+
+  geom_smooth(aes(x=mean_lat, y = mean_contrib/(sd^2)), method = "lm")
+  
+summary(lm(mean_contrib/sd^2 ~ mean_lat, data = move_sum))
 ggplot(move_sum)+
   geom_point(aes(x=mean_lat, y = tot_contrib))
 ggplot(move_sum)+

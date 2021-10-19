@@ -106,7 +106,7 @@ sp <- tbl(db, "individual")
 
 dat <- anno0 %>% 
   left_join(sp, by = "individual_id") %>% 
-  filter(taxon_canonical_name == "Anthropoides virgo") %>%
+  # filter(taxon_canonical_name == "Anthropoides virgo") %>%
   collect()
 
 message("Gathering niche data...")
@@ -135,8 +135,9 @@ anno_mod <- dat %>%
             g_speed_m = mean(ground_speed),
             ts = timestamp[1]) 
 
-#read in NSD data created by `calc_nsd.r`
+# read in NSD data created by `calc_nsd.r`
 dat_track_nsd <- read.csv("analysis/cranes/nsd.csv")
+
 
 
 ##---- Fit som gams by individual ----##
@@ -255,14 +256,13 @@ m <- gam(evi_m ~ 0 + sp_f + s(doy, bs = "cc", by = sp_f, k = 5),
          data = anno_mod, method = 'REML')
 m_lat <- gam(evi_m ~ 0 + sp_f + s(lat_m, bs = "tp", by = sp_f, k = 5),
              data = anno_mod, method = 'REML')
-
 mRE <- gam(evi_m ~ 0 + sp_f + s(doy, bs = "cc", by = sp_f, k = 5) + s(individual_id, bs = "re"),
            data = anno_mod, method = 'REML')
 
 summary(m)
-plot(m_lat)
+plot(m)
 
-AIC(m0, m, m_lat)
+AIC(m0, m)
 
 # function to compare factor smooths
 smooth_diff <- function(model, newdata, f1, f2, var, alpha = 0.05,
@@ -362,7 +362,7 @@ comp12 <- smooth_diff(m, pdat, 'Anthropoides virgo', 'Anthropoides paradiseus', 
 comp13 <- smooth_diff(m, pdat, 'Balearica pavonina', 'Anthropoides paradiseus', 'sp_f')
 
 comp <- cbind(doy = 1:366,
-              rbind(comp1, comp2, comp4, comp5, comp6, comp7, comp9, comp10, 
+              rbind(comp1, comp2, comp4, comp5, comp7, comp9, comp10, 
                     comp11, comp12, comp13))
 comp <- comp[complete.cases(comp),]
 
