@@ -3,10 +3,13 @@ library(lubridate)
 library(dplyr)
 library(RSQLite)
 library(DBI)
+library(gridExtra)
+library(ggplot2)
+
 
 #---- Functions ----#
 
-# Anticipates vector of smaple means, vector of smaple variances
+# Anticipates vector of sample means, vector of sample variances
 estPopVar <- function(sd, means){
   pop_mean <- mean(means)
   n <- length(sd)
@@ -42,7 +45,7 @@ pop <- read.csv("analysis/cranes/Anthropoides virgo_landsat8_evi_500_16.csv")
 # Pull in indivdiual niches
 
 .anno <- "anno_join_2021-09-08"
-.wd <- '~/project/niche_scratch'
+.wd <- '~/projects/niche_scratch'
 .dbPF <- file.path(.wd,'data/anno_move.db')
 
 db <- dbConnect(RSQLite::SQLite(), .dbPF, `synchronous` = NULL)
@@ -136,6 +139,7 @@ dat <- dat %>%
          yr = year(ts),
          indyr = factor(paste0(ind_f, yr)))
 
+
 #---- Plots ----#
 library(ggplot2)
 library(viridisLite)
@@ -218,7 +222,7 @@ ggplot(move_sum)+
   geom_point(aes(x=mean_lat, y = tot_contrib))
 ggplot(move_sum)+
   geom_point(aes(x=mean_lon, y = tot_contrib))
-ggplot(move_sum)+
+ggplot(move_sum)+ 
   geom_point(aes(x=mean_lon, y = mean_lat))
 ggplot(move_sum)+
   geom_point(aes(x=dur, y = max_nsd))
@@ -227,3 +231,117 @@ ggplot(move_sum)+
 ggplot(move_sum, aes(x=max_nsd)) +
   geom_density() +
   geom_dotplot()
+
+
+#---- Intra-Individual Analysis ----#
+inds <- unique(dat$ind_f)
+
+out <- list()
+
+for (j in 1:length(inds)){
+  targ <- inds[j]
+  
+  ind_dat <-dat %>% 
+    filter(ind_f == targ) %>% 
+    mutate(week = week(ts))
+  
+  # Calc weekly means and vars
+  targ_sum <- ind_dat %>%
+    mutate(ind_f = as.factor(individual_id),
+           week_f = as.character(week)) %>%
+    group_by(week_f) %>% 
+    summarise(mu = mean(na.omit(`value_derived:evi`)),
+              sd = sd(na.omit(`value_derived:evi`)),
+              ind_f = ind_f[1],
+              week = week[1])
+  
+  # make ind estimates
+  (mix_mean <-mean(na.omit(targ_sum$mu))) 
+  (mix_var <- estPopVar(sd = na.omit(targ_sum$sd), means = na.omit(targ_sum$mu)))
+  
+  # individual direct calc
+  (mu_ind <- mean(na.omit(ind_dat$`value_derived:evi`)))
+  (sd_ind <- var(na.omit(ind_dat$`value_derived:evi`)))
+  
+  # get weekly contributions to ind variance
+  contrib <- c()
+  mean_con <- c()
+  for(i in 1:nrow(targ_sum)){
+    contrib[i] <- indContrib(targ_sum$mu[i], targ_sum$sd[i], mu_pop = mu_ind, n = nrow(targ_sum))
+    mean_con[i] <- muContrib(targ_sum$mu[i], mu_pop = mu_ind, n = nrow(ind_sum))
+  }
+  targ_sum$tot_contrib <- contrib
+  targ_sum$mean_contrib <- mean_con
+  targ_sum$week_f <- as.factor(targ_sum$week)
+  
+  # Pull some movement stats for targ ind
+  move_sum_ind <- dat_track_nsd %>% 
+    mutate(ind_f = as.character(individual_id),
+           week_f = as.character(week),
+           ts = ymd_hms(timestamp)) %>% 
+    filter(ind_f == targ) %>% 
+    group_by(week_f) %>% 
+    summarise(max_nsd = max(na.omit(netSQ)),
+              max_v = max(na.omit(vel)),
+              mean_v = mean(na.omit(vel)),
+              mean_lat = mean(y_),
+              mean_lon = mean(x_), 
+              dur = difftime(max(ts), min(ts), units = "days")) %>% 
+    right_join(targ_sum)
+  
+  out[[j]] <- move_sum_ind
+  print(glue("{j} out of {length(inds)}"))
+}
+
+
+out_tot <- do.call("rbind", out)
+
+p1 <- ggplot(data = out_tot) +
+  geom_point(aes(x=week, y= mean_contrib))
+
+p2 <- ggplot(data = out_tot) +
+  geom_point(aes(x=week, y= sd^2))
+
+p3 <- ggplot(data = out_tot) +
+  geom_line(aes(x=week, y= max_nsd, color = ind_f)) +
+  theme(legend.position = "none")
+
+# combine plots
+comb_plot <- grid.arrange(p1, p2, p3,
+                       ncol = 1)
+
+
+ggplot(data = out_tot)+
+  geom_point(aes(x = mean_v, y = sd^2))
+
+  # filter(dur >= 200) #remove individuals with "short" tracks
+
+
+#plot individual means (like a coefficient plot)
+targ_sum %>% mutate(week_f = fct_reorder(week_f, mean_contrib, min)) %>%   # reset factors
+  ggplot()+
+  geom_point(aes(x=mu, y = week_f, color = tot_contrib))+
+  scale_color_viridis_c() +
+  geom_vline(data=ind_dat, aes(xintercept=var(na.omit(`value_derived:evi`))))+
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+#plot individual vars (like a coefficient plot)
+targ_sum %>% mutate(week_f = fct_reorder(week_f, sd^2, min)) %>%   # reset factors
+  ggplot()+
+  geom_point(aes(x=sd^2, y = week_f, color = tot_contrib))+
+  scale_color_viridis_c() +
+  geom_vline(data=ind_dat, aes(xintercept=var(na.omit(`value_derived:evi`))))+
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+
+ggplot(data = targ_sum)+
+  geom_line(aes(x=week, y = tot_contrib))+
+  geom_line(aes(x=week, y = sd^2), color = "red")+
+  geom_line(aes(x=week, y = mean_contrib), color = "blue")
+  
+ggplot(data = move_sum_ind)+
+  geom_point(aes(x=mean_lat, y = tot_contrib))

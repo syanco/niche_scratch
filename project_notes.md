@@ -23,6 +23,8 @@
 |2021-08-06|Setting aside old wf dev b/c we have a fully-annotated crane dataset, proceeding with new wf building from that|
 |2021-08-16|Crane workflow built through flexible joining of annotations and time-dynamic niche size estimation.|
 |2021-08-18|Working scripts to produce NSD, velocity, ncihe size, niche dissim!|
+|2021-09/10-all|Missing logs|
+|2021-10-25|Trying to incorporate niche mixtures inot the workflow, started buildign a script to segment for all seasons from ctf|
 
 ## Notes
 * Cranes pre-anotated by STOAT team at Map of Life.  

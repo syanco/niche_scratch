@@ -111,7 +111,8 @@ dat_track_nsd <- evt_mod %>%
     x %>%   
       # convert to `amt` track
       make_track(.x = lon, .y = lat, .t = ts, order_by_ts = F, 
-                 crs = CRS("+init=epsg:4326"), all_cols = T) %>% 
+                 crs = CRS("+init=epsg:4326"), all_cols = T) %>%
+      steps(zero_dir = "N", keep_cols = "end")
       mutate(netSQ=nsd(.),
              vel = netSQ-dplyr::lag(netSQ)) #add NSD variable to each individual DF
   }) %>% 
