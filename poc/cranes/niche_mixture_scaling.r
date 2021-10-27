@@ -1,3 +1,5 @@
+# Use the `niche_mix` conda environment
+
 library(forcats)
 library(lubridate)
 library(dplyr)
@@ -155,6 +157,7 @@ ggplot() +
   geom_line(data = dat , aes(x=`value_derived:evi`, group = individual_id, color = individual_id), alpha = 0.2,
             stat = "density") +
   geom_density(dat = pop, aes(x=value), size = 2)
+
 
 
 #plot individual means (like a coefficient plot)
@@ -316,32 +319,50 @@ ggplot(data = out_tot)+
 
   # filter(dur >= 200) #remove individuals with "short" tracks
 
+pop_df <- data.frame(mu = pop_mean,
+                     var = pop_var)
 
 #plot individual means (like a coefficient plot)
-targ_sum %>% mutate(week_f = fct_reorder(week_f, mean_contrib, min)) %>%   # reset factors
+out_tot %>% mutate(week_f = fct_reorder(week_f, mean_contrib, min)) %>%   # reset factors
   ggplot()+
-  geom_point(aes(x=mu, y = week_f, color = tot_contrib))+
+  geom_line(aes(x=mu, y = week_f))+
   scale_color_viridis_c() +
-  geom_vline(data=ind_dat, aes(xintercept=var(na.omit(`value_derived:evi`))))+
   theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank())
+
 
 #plot individual vars (like a coefficient plot)
 targ_sum %>% mutate(week_f = fct_reorder(week_f, sd^2, min)) %>%   # reset factors
   ggplot()+
   geom_point(aes(x=sd^2, y = week_f, color = tot_contrib))+
   scale_color_viridis_c() +
-  geom_vline(data=ind_dat, aes(xintercept=var(na.omit(`value_derived:evi`))))+
+  geom_vline(data=pop_df, aes(xintercept=var(na.omit(`value_derived:evi`))))+
   theme(axis.title.y=element_blank(),
         axis.text.y=element_blank(),
         axis.ticks.y=element_blank())
 
 
-ggplot(data = targ_sum)+
-  geom_line(aes(x=week, y = tot_contrib))+
-  geom_line(aes(x=week, y = sd^2), color = "red")+
-  geom_line(aes(x=week, y = mean_contrib), color = "blue")
+ggplot(data = out_tot)+
+  geom_line(aes(x=week, y = tot_contrib, group = ind_f))+
+  geom_line(aes(x=week, y = sd^2, group = ind_f), color = "red")+
+  geom_line(aes(x=week, y = mean_contrib, group = ind_f), color = "blue")
+
+out_mean <- out_tot %>% 
+  group_by(week) %>% 
+  summarize(tot_contrib = mean(na.omit(tot_contrib)),
+            var = mean(na.omit(sd^2)),
+            mean_contrib = mean(na.omit(mean_contrib)))
+ggplot(data = out_mean)+
+  geom_point(aes(x=week, y = tot_contrib))+
+  geom_smooth(aes(x=week, y = tot_contrib), color = "black")+
+  geom_point(aes(x=week, y = var), color = "red")+
+  geom_smooth(aes(x=week, y = var), color = "red")+
+  geom_point(aes(x=week, y = mean_contrib), color = "blue") +
+  geom_smooth(aes(x=week, y = mean_contrib), color = "blue")
+  
+
+
   
 ggplot(data = move_sum_ind)+
   geom_point(aes(x=mean_lat, y = tot_contrib))

@@ -24,14 +24,15 @@
 |2021-08-16|Crane workflow built through flexible joining of annotations and time-dynamic niche size estimation.|
 |2021-08-18|Working scripts to produce NSD, velocity, ncihe size, niche dissim!|
 |2021-09/10-all|Missing logs|
-|2021-10-25|Trying to incorporate niche mixtures inot the workflow, started buildign a script to segment for all seasons from ctf|
+|2021-10-25|Trying to incorporate niche mixtures into the workflow, started building a script to segment for all seasons from ctf|
+|2021-20-27|Script that gets ind and season-specific mean and var from full data set - returns csv per sp|
 
 ## Notes
 * Cranes pre-anotated by STOAT team at Map of Life.  
 * Questions:  
   * What's the baseline for dissimilarity calculations?
   * Common set of niche variables?
-
+* For ind- season-specific mean and var script, note that A. paradesius apparently correctly returns df/cdv of nrow=0
 
 **OLD NOTES**
 * The anotator relies on breaking data up into chunks of 1000 - this could probably be parallelized easily for large datasets
