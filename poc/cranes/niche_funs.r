@@ -171,3 +171,34 @@ indNicheAccum <- function(ind_ID, data, interval, min_obs = 2, vars){
   
   return(dat_ind) #return the combined DF for the target individual
 }
+
+
+#-- Individual to Population Functions  --##
+
+# Anticipates vector of sample means, vector of sample variances
+estPopVar <- function(var, means, pop_mean){
+  n <- length(var)
+  
+  vec <- c()
+  
+  for(i in 1:n){
+    vec[i] <- (1/n)*(var[i] + means[i]^2 - pop_mean^2)
+  }
+  
+  out <- sum(vec)
+  return(out)
+}
+
+# calculate an individual's total contribution to pop variance 
+indContrib <- function(mu_i, var_i, mu_pop, n){
+  # n <- length(mu_i)
+  cont <- (1/n)*(var_i + mu_i^2 - mu_pop^2)
+  return(cont)
+}
+
+# calculate the mean component of ind contribution to pop variance
+#(variance contrib is just the ind variance itself)
+muContrib <- function(mu_i, mu_pop, n){
+  cont <- (1/n)*(mu_i^2 - mu_pop^2)
+  return(cont)
+}

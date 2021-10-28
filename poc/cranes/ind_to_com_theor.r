@@ -66,82 +66,13 @@ normalDensity <- function(mu, sd){
 
 #---- SIMS ----#
 
-mu_is <- rnorm(n=100, mean=0, sd=100)
-var_is <- rgamma(shape= 9, 100)
+mu_is <- rnorm(n=100, mean=0, sd=1)
+# var_is <- rgamma(shape= 9, 100)
+# mu_is <- rep(0, 100)
+var_is <- rep(1, 100)
 
 pop_mu <- popMu(mu_is)
 pop_var <- popVar(sd=sqrt(var_is), mu_is)
 
 den <- normalDensity(pop_mu, sqrt(pop_var))
 plot(den$x, den$y, type = "l")
-
-
-#==============================================================================#
-
-#---- Using ind means ----#
-
-
-#-- Functions --#
-
-comVar2 <- function(mean_pop_var, mean_pop_diff){
-  mean_pop_var + mean_pop_diff
-}
-
-popVar2 <- fucntion(mean_ind_var, mean_ind_diff){
-  mean_ind_var + mean_ind_diff
-}
-
-meanIndDiff <- function(mu_vec){
-  #get population mean
-  pop_mu <- mean(mu_vec)
-  
-  #get num individuals
-  n <- length(mu_vec)
-  
-  #init empty vector to hold ind diffs
-  v <- c()
-  #calc ind diffs
-  for(i in 1:n){
-    (1/n)*(mu_vec[i]^2-pop-mu^2)
-  }
-  
-  #take the sum of the weighted vector
-  out <- sum(v)
-  
-  return(out)
-}
-
-meanPopDiff <- function(mu_vec, w_vec){
-  #get population mean
-  com_mu <- mean(mu_vec)
-  
-  #get num individuals
-  n <- length(mu_vec)
-  
-  #init empty vector to hold ind diffs
-  v <- c()
-  #calc ind diffs
-  for(i in 1:n){
-    w_vec*(mu_vec[i]^2-com-mu^2)
-  }
-  
-  #take the sum of the weighted vector
-  out <- sum(v)
-  
-  return(out)
-}
-
-
-#-- Demo --#
-
-# Individual trade-off within population
-pop_var <- 10
-
-mean_ind_var <- seq(0,10, by = 0.1)
-
-mean_mu_diff <- c()
-for(i in 1:length(mean_ind_var)){
-  mean_mu_diff[i] <- pop_var-mean_ind_var[i]
-}
-
-plot(x=mean_ind_var, y=mean_mu_diff)

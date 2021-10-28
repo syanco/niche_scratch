@@ -311,7 +311,7 @@ for(s in 1:length(species$taxon_canonical_name)){
     if(nrow(seg_wint) > 0 & "run" %in% colnames(seg_wint)){
       for(i in 1:nrow(seg_wint)){
         
-        #format data as `telemetry` object for ctmm
+        # extract season of interest
         evt_tmp <- evt_mod %>% 
           filter(timestamp > seg_wint$`End Fall`[i] & timestamp < seg_wint$`Start Spring`[i])
         
@@ -326,7 +326,9 @@ for(s in 1:length(species$taxon_canonical_name)){
           season = "Winter",
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
-          var =var(na.omit(evt_tmp$`value_derived:evi`))
+          var = var(na.omit(evt_tmp$`value_derived:evi`)),
+          n = nrow(evt_tmp),
+          ts = evt_tmp$timestamp
         )
         wint_out[[i]] <- tmp_out
       } #i
@@ -356,7 +358,9 @@ for(s in 1:length(species$taxon_canonical_name)){
           season = "Summer",
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
-          var =var(na.omit(evt_tmp$`value_derived:evi`))
+          var =var(na.omit(evt_tmp$`value_derived:evi`)),
+          n = nrow(evt_tmp),
+          ts = evt_tmp$timestamp
         )
         summ_out[[i]] <- tmp_out
       } #i
@@ -386,7 +390,9 @@ for(s in 1:length(species$taxon_canonical_name)){
           season = "Spring",
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
-          var =var(na.omit(evt_tmp$`value_derived:evi`))
+          var =var(na.omit(evt_tmp$`value_derived:evi`)),
+          n = nrow(evt_tmp),
+          ts = evt_tmp$timestamp
         )
         spring_out[[i]] <- tmp_out
       } #i
@@ -416,7 +422,9 @@ for(s in 1:length(species$taxon_canonical_name)){
           season = "Fall",
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
-          var =var(na.omit(evt_tmp$`value_derived:evi`))
+          var =var(na.omit(evt_tmp$`value_derived:evi`)),
+          n = nrow(evt_tmp),
+          ts = evt_tmp$timestamp
         )
         fall_out[[i]] <- tmp_out
       } #i
@@ -427,12 +435,16 @@ for(s in 1:length(species$taxon_canonical_name)){
     
     ind_ls <- list(
       wint = if(length(wint_out) > 0){do.call("rbind", wint_out)}else{NULL},
-      summ = if(length(summ_out) > 0){do.call("rbind", summ_out)}else{NULL},
       spring = if(length(spring_out) > 0){do.call("rbind", spring_out)}else{NULL},
+      summ = if(length(summ_out) > 0){do.call("rbind", summ_out)}else{NULL},
       fall = if(length(fall_out) > 0){do.call("rbind", fall_out)}else{NULL}
     )
     
-    sp_ls[[j]] <- do.call("rbind", ind_ls)
+    #add sp name to the df, catch any null dfs
+    sp_ls[[j]] <- do.call("rbind", ind_ls) %>%
+      {if(!is.null(.)){
+        mutate(., species = species$taxon_canonical_name[s])
+      }else{.}}
     
   } #j (end loop through individuals)
   
