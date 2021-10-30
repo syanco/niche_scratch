@@ -247,7 +247,7 @@ for(s in 1:length(sp_c)){
 message("\n Writing pdfs...")
 
 pdf(file.path(.outPF, glue("seasonal_ind_contrib_{Sys.Date()}.pdf")),
-    width = 8, height = 10.5, paper = "letter")
+    width = 8, height = 10.5)
 
 for(s in 1:length(sp_c_plot)){
   # check for no dataconditon and move to next if found 
@@ -292,9 +292,66 @@ for(s in 1:length(sp_c_plot)){
   grid.newpage()
   grid.draw(out)
   
-}
+} # s
 
 dev.off()
+
+
+#-- Seasonal population level plot
+
+pdf(file.path(.outPF, glue("seasonal_pop_est_{Sys.Date()}.pdf")),
+    width = 6, height = 8)
+
+
+# put species name at the top level tibble
+for(s in 1:length(sp_c)){
+  # check for no dataconditon and move to next if found 
+  if(is.null(sp_c[[s]])){
+    message("No records found moving to next species...")
+    next
+  }else{
+    sp_c[[s]] <- sp_c[[s]] %>% 
+      mutate(species = sp_c[[s]]$data[[1]]$species[1])
+  }
+} # s
+
+sp_tot <- do.call("rbind", sp_c)
+ggplot()+
+  geom_point(data = sp_test, aes(x=season, y=grand_mean, color=season))+
+  geom_errorbar(data = sp_tot, aes(x=season, ymin=grand_mean-sqrt(var_est), 
+                    ymax=grand_mean+sqrt(var_est), 
+                    width = 0.25, color = season)) +
+  facet_wrap(~species, ncol=1)
+  
+dev.off()
+
+sp_test <- sp_tot %>% unnest(cols=c(ind_components), names_repair = "unique") %>% 
+  rename(species = species...10) 
+
+# very inelegant way to get new ids for individuals with multiple years...
+newids <- sp_test$ind[duplicated(sp_test$ind)]+444444
+sp_test$fakeid <- sp_test$ind
+sp_test$fakeid[duplicated(sp_test$ind)] <- newids
+
+ggplot()+
+  geom_point(data = sp_test, aes(x=season, y=grand_mean, color=season))+
+  geom_errorbar(data = sp_tot, aes(x=season, ymin=grand_mean-sqrt(var_est), 
+                                   ymax=grand_mean+sqrt(var_est), 
+                                   width = 0.25, color = season)) +
+  geom_point(data = sp_test, 
+             aes(x=season, y = mean, group = season, color = season))+
+  facet_wrap(~species, ncol=1)
+
+ggplot(data = sp_test, 
+       aes(x=season, y = ind_mu_contrib, color = season))+
+  geom_point()+
+  geom_line(aes(group = fakeid))+
+  facet_wrap(~species, ncol=1)
+ggplot(data = sp_test, 
+       aes(x=season, y = var, color = season))+
+  geom_point()+
+  geom_line(aes(group = fakeid))+
+  facet_wrap(~species, ncol=1)
 
 #---- Finalize script ----#
 

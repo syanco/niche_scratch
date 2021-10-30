@@ -327,8 +327,7 @@ for(s in 1:length(species$taxon_canonical_name)){
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
           var = var(na.omit(evt_tmp$`value_derived:evi`)),
-          n = nrow(evt_tmp),
-          ts = evt_tmp$timestamp
+          n = nrow(evt_tmp)
         )
         wint_out[[i]] <- tmp_out
       } #i
@@ -359,8 +358,7 @@ for(s in 1:length(species$taxon_canonical_name)){
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
           var =var(na.omit(evt_tmp$`value_derived:evi`)),
-          n = nrow(evt_tmp),
-          ts = evt_tmp$timestamp
+          n = nrow(evt_tmp)
         )
         summ_out[[i]] <- tmp_out
       } #i
@@ -391,8 +389,7 @@ for(s in 1:length(species$taxon_canonical_name)){
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
           var =var(na.omit(evt_tmp$`value_derived:evi`)),
-          n = nrow(evt_tmp),
-          ts = evt_tmp$timestamp
+          n = nrow(evt_tmp)
         )
         spring_out[[i]] <- tmp_out
       } #i
@@ -423,8 +420,7 @@ for(s in 1:length(species$taxon_canonical_name)){
           ind = as.character(ind[j]),
           mean = mean(na.omit(evt_tmp$`value_derived:evi`)),
           var =var(na.omit(evt_tmp$`value_derived:evi`)),
-          n = nrow(evt_tmp),
-          ts = evt_tmp$timestamp
+          n = nrow(evt_tmp)
         )
         fall_out[[i]] <- tmp_out
       } #i
