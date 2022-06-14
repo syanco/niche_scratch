@@ -132,15 +132,24 @@ for(s in 1:length(dat0)){
                    .x$mean, 
                    n = nrow(.x), 
                    mu_pop = .y),
-                 ind_var_contrib = var/nrow(.x))})
-    ) %>% 
-    unnest(c(season)) %>% 
-    ungroup() %>% 
-    # set season factor order and sort tibble by season
-    mutate(season = fct_relevel(season, "Winter", "Spring", "Summer")) %>% 
-    arrange(season)
-  
-} # s
+                 ind_var_contrib = var/nrow(.x))}),
+      #get parametric probability densities for later plotting
+      distributions = map2(
+        .x = grand_mean, 
+        .y = var_est,
+        ~{data.frame(x = seq(-1, 1, length.out = 501),
+                     prob = dnorm(
+                       x = seq(-1, 1, length.out = 501),
+                       mean = .x,
+                       sd = sqrt(.y)))})
+      ) %>% 
+        unnest(c(season)) %>% 
+        ungroup() %>% 
+        # set season factor order and sort tibble by season
+        mutate(season = fct_relevel(season, "Winter", "Spring", "Summer")) %>% 
+        arrange(season)
+      
+      } # s
 
 #--  "Coefficient Plots" for Each Species
 message("\n Making 'coefficient plots' for each species...")
@@ -299,13 +308,9 @@ dev.off()
 
 #-- Seasonal population level plot
 
-pdf(file.path(.outPF, glue("seasonal_pop_est_{Sys.Date()}.pdf")),
-    width = 6, height = 8)
-
-
 # put species name at the top level tibble
 for(s in 1:length(sp_c)){
-  # check for no dataconditon and move to next if found 
+  # check for no data conditon and move to next if found 
   if(is.null(sp_c[[s]])){
     message("No records found moving to next species...")
     next
@@ -315,18 +320,35 @@ for(s in 1:length(sp_c)){
   }
 } # s
 
+#rbind across species
 sp_tot <- do.call("rbind", sp_c)
-ggplot()+
-  geom_point(data = sp_test, aes(x=season, y=grand_mean, color=season))+
-  geom_errorbar(data = sp_tot, aes(x=season, ymin=grand_mean-sqrt(var_est), 
-                    ymax=grand_mean+sqrt(var_est), 
-                    width = 0.25, color = season)) +
-  facet_wrap(~species, ncol=1)
-  
+
+#extract disributions with season and species into long-form df
+dist_df <- sp_tot %>% 
+  select(species, season, distributions) %>%
+  unnest(cols = c(species, season, distributions))
+
+dist_df$prob[dist_df$prob == 0] <- NA
+
+
+pdf(file.path(.outPF, glue("seasonal_pop_est_{Sys.Date()}.pdf")),
+    width = 6, height = 8)
+
+ggplot(dist_df)+
+  geom_polygon(aes(color = season, fill = season, x = prob, y = x),
+               alpha = 0.5)+
+  geom_polygon(aes(color = season, fill = season, x = -prob, y = x),
+               alpha = 0.5)+
+  geom_hline(aes(yintercept = 0))+
+  ylim(c(-0.25, 0.75)) +
+  ylab("EVI") +
+  xlab("Probability Density") +
+  facet_grid(species ~ season)
+
 dev.off()
 
 sp_test <- sp_tot %>% unnest(cols=c(ind_components), names_repair = "unique") %>% 
-  rename(species = species...10) 
+  rename(species = species...11) 
 
 # very inelegant way to get new ids for individuals with multiple years...
 newids <- sp_test$ind[duplicated(sp_test$ind)]+444444
